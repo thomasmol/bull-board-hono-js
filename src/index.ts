@@ -9,6 +9,8 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Redis } from "ioredis";
 import dotenv from "dotenv";
 import { getCookie, setCookie } from "hono/cookie";
+import bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
 
@@ -17,6 +19,21 @@ const redis = new Redis(`${process.env.PRIVATE_REDIS_URL}?family=0`, {
 });
 const createQueueMQ = (name: string) =>
   new QueueMQ(name, { connection: redis });
+
+const rateLimiter = (limit: number, window: number) => {
+  return async (c: Context, next: () => Promise<void>) => {
+    const ip = c.req.header('x-forwarded-for') || 'unknown';
+    const key = `bullmq:admin:rate_limit:${ip}`;
+    const current = await redis.incr(key);
+    if (current === 1) {
+      await redis.expire(key, window);
+    }
+    if (current > limit) {
+      return c.text('Too many requests', 429);
+    }
+    await next();
+  };
+};
 
 const run = async () => {
   const app = new Hono();
@@ -39,8 +56,12 @@ const run = async () => {
 
   // Middleware to check if user is authenticated
   const authMiddleware = async (c: Context<any, any, {}>, next: () => any) => {
-    const isAuthenticated = getCookie(c, "isAuthenticated") === "true";
-    if (!isAuthenticated) {
+    const sessionToken = getCookie(c, "bullMqAdminSessionToken");
+    if (!sessionToken) {
+      return c.redirect("/login");
+    }
+    const isValid = await redis.get(`bullmq:admin:session:${sessionToken}`);
+    if (!isValid) {
       return c.redirect("/login");
     }
     await next();
@@ -64,17 +85,26 @@ const run = async () => {
     `);
   });
 
+  // Replace the loginRateLimiter definition with this:
+  const loginRateLimiter = rateLimiter(5, 60); // 5 requests per 60 seconds
+
   // Login handler
-  app.post("/login", async (c) => {
+  app.post("/login", loginRateLimiter, async (c) => {
     const { username, password } = await c.req.parseBody();
+    const storedHash = process.env.PRIVATE_ADMIN_PASSWORD_HASH;
+    
     if (
       username === process.env.PRIVATE_ADMIN_USERNAME &&
-      password === process.env.PRIVATE_ADMIN_PASSWORD
+      storedHash && bcrypt.compareSync(password.toString(), storedHash)
     ) {
-      setCookie(c, "isAuthenticated", "true", {
+      const sessionToken = uuidv4();
+      await redis.set(`bullmq:admin:session:${sessionToken}`, 'valid', 'EX', 60 * 60 * 24); // Expires in 24 hours
+      setCookie(c, "bullMqAdminSessionToken", sessionToken, {
         httpOnly: true,
         path: "/",
         maxAge: 60 * 60 * 24, // 1 day
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Lax',
       });
       return c.redirect(basePath);
     } else {
@@ -83,8 +113,12 @@ const run = async () => {
   });
 
   // Logout route
-  app.get("/logout", (c) => {
-    setCookie(c, "isAuthenticated", "false", {
+  app.get("/logout", async (c) => {
+    const sessionToken = getCookie(c, "sessionToken");
+    if (sessionToken) {
+      await redis.del(`session:${sessionToken}`);
+    }
+    setCookie(c, "sessionToken", "", {
       httpOnly: true,
       path: "/",
       maxAge: 0,
