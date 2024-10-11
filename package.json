@@ -1,0 +1,18 @@
+{
+  "name": "bull-board-hono-js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@bull-board/hono": "^6.0.2",
+    "@hono/node-server": "^1.13.2",
+    "bullmq": "^5.18.0",
+    "dotenv": "^16.4.5",
+    "hono": "^4.6.3",
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.17",
+    "tsx": "^4.7.1"
+  }
+}
