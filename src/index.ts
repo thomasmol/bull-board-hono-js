@@ -23,7 +23,7 @@ const createQueueMQ = (name: string) =>
 const rateLimiter = (limit: number, window: number) => {
   return async (c: Context, next: () => Promise<void>) => {
     const ip = c.req.header('x-forwarded-for') || 'unknown';
-    const key = `bullmq:admin:rate_limit:${ip}`;
+    const key = `bull-board:rate_limit:${ip}`;
     const current = await redis.incr(key);
     if (current === 1) {
       await redis.expire(key, window);
@@ -38,7 +38,7 @@ const rateLimiter = (limit: number, window: number) => {
 const SESSION_DURATION = 60 * 60 * 24 * 7; // 7 days in seconds
 
 const refreshSession = async (c: Context, sessionToken: string) => {
-  await redis.expire(`bullmq:admin:session:${sessionToken}`, SESSION_DURATION);
+  await redis.expire(`bull-board:session:${sessionToken}`, SESSION_DURATION);
   setCookie(c, "bullMqAdminSessionToken", sessionToken, {
     httpOnly: true,
     path: "/",
@@ -105,7 +105,7 @@ const run = async () => {
     if (!sessionToken) {
       return c.redirect("/login");
     }
-    const isValid = await redis.get(`bullmq:admin:session:${sessionToken}`);
+    const isValid = await redis.get(`bull-board:session:${sessionToken}`);
     if (!isValid) {
       return c.redirect("/login");
     }
@@ -144,7 +144,7 @@ const run = async () => {
       storedHash && bcrypt.compareSync(password.toString(), storedHash)
     ) {
       const sessionToken = uuidv4();
-      await redis.set(`bullmq:admin:session:${sessionToken}`, 'valid', 'EX', SESSION_DURATION);
+      await redis.set(`bull-board:session:${sessionToken}`, 'valid', 'EX', SESSION_DURATION);
       setCookie(c, "bullMqAdminSessionToken", sessionToken, {
         httpOnly: true,
         path: "/",
@@ -162,7 +162,7 @@ const run = async () => {
   app.get("/logout", async (c) => {
     const sessionToken = getCookie(c, "bullMqAdminSessionToken");
     if (sessionToken) {
-      await redis.del(`bullmq:admin:session:${sessionToken}`);
+      await redis.del(`bull-board:session:${sessionToken}`);
     }
     setCookie(c, "bullMqAdminSessionToken", "", {
       httpOnly: true,
