@@ -48,19 +48,51 @@ const refreshSession = async (c: Context, sessionToken: string) => {
   });
 };
 
+const QUEUE_PREFIX = process.env.QUEUE_PREFIX || '';
+const PRIVATE_MANUAL_QUEUE_NAMES = process.env.PRIVATE_MANUAL_QUEUE_NAMES?.split(',').filter(Boolean) || [];
+
+let discoveredQueues: BullMQAdapter[] = [];
+
+const discoverQueues = async (): Promise<void> => {
+  if (PRIVATE_MANUAL_QUEUE_NAMES.length > 0) {
+    // Use only manually specified queues
+    discoveredQueues = PRIVATE_MANUAL_QUEUE_NAMES.map(name => {
+      const queue = createQueueMQ(name);
+      return new BullMQAdapter(queue);
+    });
+  } else {
+    // Auto-discover queues
+    const queueNames = new Set<string>();
+    let cursor = '0';
+    do {
+      const [newCursor, keys] = await redis.scan(
+        cursor,
+        'MATCH',
+        `bull:${QUEUE_PREFIX}*:meta`,
+        'COUNT',
+        '100'
+      );
+      cursor = newCursor;
+      keys.forEach(key => queueNames.add(key.split(':')[1]));
+    } while (cursor !== '0');
+
+    discoveredQueues = Array.from(queueNames).map(name => {
+      const queue = createQueueMQ(name);
+      return new BullMQAdapter(queue);
+    });
+  }
+};
+
 const run = async () => {
   const app = new Hono();
 
   const serverAdapter = new HonoAdapter(serveStatic);
-  const queueNames = process.env.PRIVATE_QUEUE_NAMES?.split(",") ?? [];
-  const queues: BullMQAdapter[] = [];
-  for (const name of queueNames) {
-    const queue = createQueueMQ(name);
-    queues.push(new BullMQAdapter(queue));
-  }
+  
+  // Discover queues on startup
+  await discoverQueues();
 
   createBullBoard({
-    queues,
+    queues: discoveredQueues,
     serverAdapter,
   });
 
@@ -138,6 +170,15 @@ const run = async () => {
       maxAge: 0,
     });
     return c.redirect("/login");
+  });
+
+  // Add a new route to trigger queue rediscovery
+  app.get("/discoverQueues", authMiddleware, async (c) => {
+    await discoverQueues();
+    return c.json({ 
+      message: PRIVATE_MANUAL_QUEUE_NAMES.length > 0 ? "Using manually specified queues" : "Queues rediscovered successfully", 
+      count: discoveredQueues.length 
+    });
   });
 
   showRoutes(app);
