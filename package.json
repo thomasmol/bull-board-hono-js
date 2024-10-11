@@ -1,7 +1,9 @@
 {
   "name": "bull-board-hono-js",
   "scripts": {
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "generate-password-hash": "tsx generate-password-hash.ts"
   },
   "dependencies": {
     "@bull-board/hono": "^6.0.2",

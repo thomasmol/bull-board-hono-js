@@ -13,7 +13,7 @@ import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
-
+const port = process.env.PORT || 3000;
 const redis = new Redis(`${process.env.PRIVATE_REDIS_URL}?family=0`, {
   maxRetriesPerRequest: null,
 });
@@ -128,7 +128,7 @@ const run = async () => {
 
   showRoutes(app);
 
-  serve({ fetch: app.fetch, port: 3000 }, ({ address, port }) => {
+  serve({ fetch: app.fetch, port: Number(port) }, ({ address, port }) => {
     console.log(`Running on ${address}:${port}...`);
   });
 };
