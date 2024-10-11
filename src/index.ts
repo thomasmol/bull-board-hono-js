@@ -35,6 +35,19 @@ const rateLimiter = (limit: number, window: number) => {
   };
 };
 
+const SESSION_DURATION = 60 * 60 * 24 * 7; // 7 days in seconds
+
+const refreshSession = async (c: Context, sessionToken: string) => {
+  await redis.expire(`bullmq:admin:session:${sessionToken}`, SESSION_DURATION);
+  setCookie(c, "bullMqAdminSessionToken", sessionToken, {
+    httpOnly: true,
+    path: "/",
+    maxAge: SESSION_DURATION,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax',
+  });
+};
+
 const run = async () => {
   const app = new Hono();
 
@@ -64,6 +77,7 @@ const run = async () => {
     if (!isValid) {
       return c.redirect("/login");
     }
+    await refreshSession(c, sessionToken);
     await next();
   };
 
@@ -98,11 +112,11 @@ const run = async () => {
       storedHash && bcrypt.compareSync(password.toString(), storedHash)
     ) {
       const sessionToken = uuidv4();
-      await redis.set(`bullmq:admin:session:${sessionToken}`, 'valid', 'EX', 60 * 60 * 24); // Expires in 24 hours
+      await redis.set(`bullmq:admin:session:${sessionToken}`, 'valid', 'EX', SESSION_DURATION);
       setCookie(c, "bullMqAdminSessionToken", sessionToken, {
         httpOnly: true,
         path: "/",
-        maxAge: 60 * 60 * 24, // 1 day
+        maxAge: SESSION_DURATION,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'Lax',
       });
@@ -114,11 +128,11 @@ const run = async () => {
 
   // Logout route
   app.get("/logout", async (c) => {
-    const sessionToken = getCookie(c, "sessionToken");
+    const sessionToken = getCookie(c, "bullMqAdminSessionToken");
     if (sessionToken) {
-      await redis.del(`session:${sessionToken}`);
+      await redis.del(`bullmq:admin:session:${sessionToken}`);
     }
-    setCookie(c, "sessionToken", "", {
+    setCookie(c, "bullMqAdminSessionToken", "", {
       httpOnly: true,
       path: "/",
       maxAge: 0,
