@@ -14,7 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
 const port = process.env.PORT || 3000;
-const redis = new Redis(`${process.env.PRIVATE_REDIS_URL}?family=0`, {
+const redis = new Redis(`${process.env.PRIVATE_REDIS_URL}`, {
   maxRetriesPerRequest: null,
 });
 const createQueueMQ = (name: string) =>
