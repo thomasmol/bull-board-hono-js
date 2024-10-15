@@ -119,6 +119,7 @@ const run = async () => {
 
   // Register the Bull Board routes
   app.route(basePath, serverAdapter.registerPlugin());
+  app.route(basePath + '/', serverAdapter.registerPlugin());
 
   // Login page
   app.get("/login", (c) => {
