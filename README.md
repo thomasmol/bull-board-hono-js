@@ -21,7 +21,7 @@ This project provides a secure admin dashboard for BullMQ using Hono.js and Redi
    PRIVATE_QUEUE_NAMES=queue1,queue2
    PRIVATE_ADMIN_USERNAME=your_admin_username
    PRIVATE_ADMIN_PASSWORD_HASH=your_admin_password_hash
-   NODE_ENV=development
+   ENV=development
    PORT=3000
    ```
 
@@ -55,7 +55,7 @@ npm run dev
 
 ## Production
 
-For production deployment, set `NODE_ENV=production` in your `.env` file and ensure you're using HTTPS.
+For production deployment, set `ENV=production` in your `.env` file and ensure you're using HTTPS.
 
 ```
 npm run build

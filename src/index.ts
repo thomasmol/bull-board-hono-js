@@ -42,7 +42,7 @@ const refreshSession = async (c: Context, sessionToken: string) => {
     httpOnly: true,
     path: "/",
     maxAge: SESSION_DURATION,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.ENV === "production",
     sameSite: "Lax",
   });
 };
@@ -186,7 +186,7 @@ const run = async () => {
         httpOnly: true,
         path: "/",
         maxAge: SESSION_DURATION,
-        secure: process.env.NODE_ENV === "production",
+        secure: process.env.ENV === "production",
         sameSite: "Lax",
       });
       return c.redirect(basePath);
