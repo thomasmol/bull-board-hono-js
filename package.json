@@ -1,8 +1,8 @@
 {
   "name": "bull-board-hono-js",
   "scripts": {
-    "dev": "bun run --hot src/index.ts",
-    "start": "bun run src/index.ts",
+    "dev": "bun run --bun --hot src/index.ts",
+    "start": "bun run --bun src/index.ts",
     "generate-password-hash": "bunx generate-password-hash.ts"
   },
   "dependencies": {
